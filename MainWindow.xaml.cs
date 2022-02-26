@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Input;
 using G1Tool.IO;
 using Microsoft.Win32;
 using Microsoft.WindowsAPICodePack.Dialogs;
@@ -78,6 +80,56 @@ namespace FETHArchiveManager
             string info2ResourceName = assembly.GetManifestResourceNames().Single(str => str.EndsWith("patch3.INFO2.bin"));
             info0.Read(new EndianBinaryReader(Assembly.GetExecutingAssembly().GetManifestResourceStream(info0ResourceName), Endianness.Little));
             info2.Read(new EndianBinaryReader(Assembly.GetExecutingAssembly().GetManifestResourceStream(info2ResourceName), Endianness.Little));
+        }
+
+        private void DataGridINFO_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (!(e.KeyboardDevice.Modifiers == ModifierKeys.Control && e.Key == Key.V))
+            {
+                return;
+            }
+
+            var i = dataGridINFO.SelectedIndex;
+            string clipboardData = Clipboard.GetData(DataFormats.Text).ToString();
+            foreach (var row in clipboardData.Split(Environment.NewLine.ToCharArray(),StringSplitOptions.RemoveEmptyEntries))
+            {
+                var cellSet = row.Split('\t');
+
+                long entryId;
+                long uncompressedSize;
+                long compressedSize;
+                bool isCompressed;
+                if
+                (
+                    cellSet.Length != 5 ||
+                    !long.TryParse(cellSet[0], out entryId) ||
+                    !long.TryParse(cellSet[1].Replace("0x",""), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out uncompressedSize) ||
+                    !long.TryParse(cellSet[2].Replace("0x", ""), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out compressedSize) ||
+                    !bool.TryParse(cellSet[3], out isCompressed)
+                )
+                {
+                    continue;
+                }
+
+                var newEntry = new INFO0Entry()
+                {
+                    EntryID = entryId,
+                    UncompressedSize = uncompressedSize,
+                    CompressedSize = compressedSize,
+                    Compressed = isCompressed,
+                    Filepath = cellSet[4]
+                };
+
+                if (info0.Count > i)
+                {
+                    info0[i] = newEntry;
+                }
+                else
+                {
+                    info0.Add(newEntry);
+                }
+                i++;
+            }
         }
 
         private void OpenButtonDATA_Click(object sender, RoutedEventArgs e)
